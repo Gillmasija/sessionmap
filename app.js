@@ -21,6 +21,21 @@ function commit(next, recovery = false) {
   } catch (error) { notify(error.message, true); return false; }
 }
 const page = document.body.dataset.page;
+const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+if (page === 'agenda') {
+  $('content').innerHTML = `<div class="grid"><section class="panel"><h2>Running order</h2><div id="summary"></div><div id="activities"></div></section>
+    <aside class="stack"><section class="panel"><h2 id="editor-title">Add an activity</h2><form id="activity-form">
+    <div class="field"><label for="activity-title">Activity name</label><input id="activity-title" required maxlength="100" placeholder="e.g. Map the challenge"></div>
+    <div class="row"><div class="field"><label for="type">Type</label><select id="type"><option>Discuss</option><option>Practice</option><option>Present</option><option>Break</option></select></div><div class="field"><label for="minutes">Minutes</label><input id="minutes" type="number" min="1" max="240" step="1" value="15" required></div></div>
+    <div class="field"><label for="notes">Facilitator notes (optional)</label><textarea id="notes" maxlength="2000" placeholder="Prompts, materials, or the outcome to aim for"></textarea></div>
+    <div class="actions"><button id="save-activity" class="primary">Add activity</button><button id="cancel-edit" type="button" hidden>Cancel edit</button></div>
+    <p class="hint">Up to 40 activities. Saved activities appear on the facilitator sheet.</p></form></section><a class="button" href="sheet.html">View facilitator sheet</a></aside></div>`;
+  $('activity-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const activity = {id: crypto.randomUUID(), title: $('activity-title').value, type: $('type').value, minutes: Number($('minutes').value), notes: $('notes').value};
+    if (commit({...session, activities: [...session.activities, activity]})) $('activity-form').reset();
+  });
+}
 if (page === 'index') {
   $('content').innerHTML = `<div class="grid"><section class="panel"><h2>Session details</h2>
     <form id="session-form"><div class="field"><label for="title">Workshop title</label><input id="title" name="title" required maxlength="100" autocomplete="off"></div>
@@ -45,6 +60,11 @@ function render() {
   if (page === 'index') {
     $('title').value = session.title; $('start').value = session.start; $('target').value = session.target;
   }
+  if (page === 'agenda') renderActivities();
+}
+function renderActivities() {
+  const rows = schedule(session).rows;
+  $('activities').innerHTML = rows.length ? rows.map(a => `<article class="activity"><div class="time">${a.start}<small>${a.minutes} min</small></div><div><h3>${escape(a.title)}</h3><span class="tag">${a.type}</span><small>Until ${a.end}</small>${a.notes ? `<p class="notes">${escape(a.notes)}</p>` : ''}</div></article>`).join('') : '<div class="empty"><h3>A blank page, full of possibility.</h3><p>Add your first activity. Start with an introduction, a question, or a quick warm-up.</p></div>';
 }
 render();
 notify(loaded.error || 'Ready. Your session stays in this browser.', blocked);
