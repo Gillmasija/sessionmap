@@ -1,0 +1,1 @@
+{"name":"sessionmap","private":true,"version":"1.0.0","type":"module","scripts":{"dev":"node scripts/serve.mjs","test":"node --test","lint":"node scripts/lint.mjs","build":"node scripts/build.mjs"}}
