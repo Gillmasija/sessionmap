@@ -1,5 +1,6 @@
 import {blankSession, validateSession, schedule, moveActivity} from './model.js';
 import {load, save, parseBackup, KEY, MAX_BACKUP} from './storage.js';
+import {demoSession} from './demo.js';
 const $ = id => document.getElementById(id);
 let storage;
 try { storage = window.localStorage; } catch { storage = {getItem(){throw Error();},setItem(){throw Error();}}; }
@@ -83,6 +84,37 @@ if (page === 'index') {
     event.preventDefault();
     commit({...session, title: $('title').value, start: $('start').value, target: Number($('target').value)});
   });
+  $('content').insertAdjacentHTML('beforeend', `<section class="panel section-gap"><h2>Keep a copy. Start with an idea.</h2><p class="muted">One session is stored in this browser. A JSON backup lets you move it to another browser or keep a copy before replacing it.</p>
+    <div class="actions"><button id="export">Download backup</button><button id="demo">Load synthetic example</button><button id="recover-raw">Download stored data</button></div>
+    <label class="file-label" for="import">Restore a SessionMap JSON backup (maximum 400 KB)</label><input id="import" type="file" accept=".json,application/json">
+    <p class="hint">Restoring or loading an example replaces the current session after confirmation. Data stays on your device. Download stored data preserves the original text even if it is damaged.</p></section>`);
+  $('export').addEventListener('click', () => download(JSON.stringify(session,null,2), 'sessionmap-backup.json'));
+  $('recover-raw').addEventListener('click', () => {
+    try {
+      const raw = storage.getItem(KEY);
+      if (raw === null) { notify('No stored data to download.'); return; }
+      download(raw, 'sessionmap-stored-data.txt', 'text/plain');
+    } catch { notify('Browser storage is unavailable. Allow storage or try another browser.', true); }
+  });
+  $('demo').addEventListener('click', () => {
+    if (confirm('Replace this session with the synthetic workshop example? Download a backup first if needed.')) commit(demoSession(),true);
+  });
+  $('import').addEventListener('change', async event => {
+    const file = event.target.files[0]; if (!file) return;
+    $('import').disabled = true; notify('Reading backup…');
+    try {
+      if (file.size > MAX_BACKUP) throw new Error('Backup is too large (maximum 400 KB).');
+      const candidate = parseBackup(await file.text());
+      if (confirm(`Replace this session with “${candidate.title}” and its ${candidate.activities.length} activities?`)) commit(candidate,true);
+      else notify('Restore cancelled. Your saved session is unchanged.');
+    } catch (error) { notify(error.message, true); }
+    finally { $('import').disabled = false; $('import').value = ''; }
+  });
+}
+function download(content, filename, type = 'application/json') {
+  const url = URL.createObjectURL(new Blob([content], {type}));
+  const link = document.createElement('a'); link.href = url; link.download = filename;
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function summary() {
   const r = schedule(session);
@@ -94,6 +126,7 @@ function render() {
   if ($('summary')) $('summary').innerHTML = summary();
   if (page === 'index') {
     $('title').value = session.title; $('start').value = session.start; $('target').value = session.target;
+    $('export').disabled = blocked;
   }
   if (page === 'agenda') renderActivities();
   if (page === 'sheet') {
