@@ -1,1 +1,16 @@
-{"name":"sessionmap","private":true,"version":"1.0.0","type":"module","scripts":{"dev":"node scripts/serve.mjs","test":"node --test","lint":"node scripts/lint.mjs","build":"node scripts/build.mjs"}}
+{
+  "name": "sessionmap",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.js",
+    "lint": "node scripts/lint.mjs",
+    "build": "node scripts/build.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
+  }
+}
