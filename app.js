@@ -21,6 +21,7 @@ function commit(next, recovery = false) {
   } catch (error) { notify(error.message, true); return false; }
 }
 const page = document.body.dataset.page;
+let editingId = null;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 if (page === 'agenda') {
   $('content').innerHTML = `<div class="grid"><section class="panel"><h2>Running order</h2><div id="summary"></div><div id="activities"></div></section>
@@ -32,9 +33,39 @@ if (page === 'agenda') {
     <p class="hint">Up to 40 activities. Saved activities appear on the facilitator sheet.</p></form></section><a class="button" href="sheet.html">View facilitator sheet</a></aside></div>`;
   $('activity-form').addEventListener('submit', event => {
     event.preventDefault();
-    const activity = {id: crypto.randomUUID(), title: $('activity-title').value, type: $('type').value, minutes: Number($('minutes').value), notes: $('notes').value};
-    if (commit({...session, activities: [...session.activities, activity]})) $('activity-form').reset();
+    const activity = {id: editingId || crypto.randomUUID(), title: $('activity-title').value, type: $('type').value, minutes: Number($('minutes').value), notes: $('notes').value};
+    const activities = editingId ? session.activities.map(a => a.id === editingId ? activity : a) : [...session.activities, activity];
+    if (commit({...session, activities})) resetEditor();
   });
+  $('cancel-edit').addEventListener('click', resetEditor);
+  $('activities').addEventListener('click', event => {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+    const {id, action} = button.dataset;
+    const a = session.activities.find(item => item.id === id);
+    if (!a) return;
+    if (action === 'edit') {
+      editingId = id; $('activity-title').value = a.title; $('type').value = a.type;
+      $('minutes').value = a.minutes; $('notes').value = a.notes;
+      $('editor-title').textContent = 'Edit activity'; $('save-activity').textContent = 'Save activity'; $('cancel-edit').hidden = false;
+      $('activity-title').focus();
+    } else if (action === 'remove') {
+      if (confirm(`Remove “${a.title}”? This cannot be undone.`) && commit({...session, activities:session.activities.filter(item => item.id !== id)})) {
+        if (editingId === id) resetEditor();
+        $('activity-title').focus();
+      }
+    } else {
+      if (commit(moveActivity(session, id, action === 'up' ? -1 : 1))) {
+        const buttons = [...$('activities').querySelectorAll('button')];
+        const next = buttons.find(b => b.dataset.id === id && b.dataset.action === action && !b.disabled) || buttons.find(b => b.dataset.id === id && b.dataset.action === 'edit');
+        next?.focus();
+      }
+    }
+  });
+}
+function resetEditor() {
+  editingId = null; $('activity-form').reset(); $('editor-title').textContent = 'Add an activity';
+  $('save-activity').textContent = 'Add activity'; $('cancel-edit').hidden = true;
 }
 if (page === 'index') {
   $('content').innerHTML = `<div class="grid"><section class="panel"><h2>Session details</h2>
@@ -64,7 +95,9 @@ function render() {
 }
 function renderActivities() {
   const rows = schedule(session).rows;
-  $('activities').innerHTML = rows.length ? rows.map(a => `<article class="activity"><div class="time">${a.start}<small>${a.minutes} min</small></div><div><h3>${escape(a.title)}</h3><span class="tag">${a.type}</span><small>Until ${a.end}</small>${a.notes ? `<p class="notes">${escape(a.notes)}</p>` : ''}</div></article>`).join('') : '<div class="empty"><h3>A blank page, full of possibility.</h3><p>Add your first activity. Start with an introduction, a question, or a quick warm-up.</p></div>';
+  $('activities').innerHTML = rows.length ? rows.map((a, i) => `<article class="activity"><div class="time">${a.start}<small>${a.minutes} min</small></div><div><h3>${escape(a.title)}</h3><span class="tag">${a.type}</span><small>Until ${a.end}</small>${a.notes ? `<p class="notes">${escape(a.notes)}</p>` : ''}<div class="actions">
+    ${[['edit','Edit'],['up','Earlier'],['down','Later'],['remove','Remove']].map(([action,label]) => `<button type="button" data-action="${action}" data-id="${escape(a.id)}" aria-label="${label}: ${escape(a.title)}"${(action === 'up' && i === 0) || (action === 'down' && i === rows.length - 1) ? ' disabled' : ''}>${label}</button>`).join('')}
+    </div></div></article>`).join('') : '<div class="empty"><h3>A blank page, full of possibility.</h3><p>Add your first activity. Start with an introduction, a question, or a quick warm-up.</p></div>';
 }
 render();
 notify(loaded.error || 'Ready. Your session stays in this browser.', blocked);
