@@ -67,6 +67,10 @@ function resetEditor() {
   editingId = null; $('activity-form').reset(); $('editor-title').textContent = 'Add an activity';
   $('save-activity').textContent = 'Add activity'; $('cancel-edit').hidden = true;
 }
+if (page === 'sheet') {
+  $('content').innerHTML = '<div class="actions no-print"><button id="print" class="primary">Print facilitator sheet</button><a class="button" href="agenda.html">Edit agenda</a></div><section id="sheet" class="panel section-gap"></section>';
+  $('print').addEventListener('click', () => window.print());
+}
 if (page === 'index') {
   $('content').innerHTML = `<div class="grid"><section class="panel"><h2>Session details</h2>
     <form id="session-form"><div class="field"><label for="title">Workshop title</label><input id="title" name="title" required maxlength="100" autocomplete="off"></div>
@@ -92,6 +96,15 @@ function render() {
     $('title').value = session.title; $('start').value = session.start; $('target').value = session.target;
   }
   if (page === 'agenda') renderActivities();
+  if (page === 'sheet') {
+    const r = schedule(session);
+    $('sheet').innerHTML = `<p class="eyebrow">Facilitator running order</p><h2 class="sheet-title">${escape(session.title)}</h2>
+      <div class="sheet-meta"><span>Start: ${session.start}</span><span>Planned finish: ${r.end}</span><span>${r.total} planned / ${session.target} target minutes</span></div>
+      <p class="budget${r.remaining < 0 ? ' over' : ''}">${r.remaining < 0 ? `${-r.remaining} minutes over target` : `${r.remaining} minutes unallocated`}</p>
+      ${r.rows.length ? r.rows.map(a => `<article class="sheet-row"><div class="sheet-time">${a.start} – ${a.end} · ${a.minutes} min · ${a.type}</div><h2>${escape(a.title)}</h2><p class="notes">${escape(a.notes || 'No facilitator notes.')}</p></article>`).join('') : '<div class="empty"><h3>No activities yet</h3><p>Add activities on the Agenda page to build your facilitator sheet.</p></div>'}
+      <p class="hint">Planned times, not a live timer. (+1d) means the following day. SessionMap</p>`;
+    $('print').disabled = blocked || !r.rows.length;
+  }
 }
 function renderActivities() {
   const rows = schedule(session).rows;
