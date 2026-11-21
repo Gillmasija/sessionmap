@@ -1,4 +1,4 @@
-import {blankSession, validateSession, schedule, moveActivity} from './model.js';
+import {schedule, moveActivity} from './model.js';
 import {load, save, parseBackup, KEY, MAX_BACKUP} from './storage.js';
 import {demoSession} from './demo.js';
 const $ = id => document.getElementById(id);
@@ -25,6 +25,7 @@ const page = document.body.dataset.page;
 let editingId = null;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 if (page === 'agenda') {
+  document.querySelector('.page-head').insertAdjacentHTML('beforeend', '<a class="button primary" href="#activity-title">Add an activity</a>');
   $('content').innerHTML = `<div class="grid"><section class="panel"><h2>Running order</h2><div id="summary"></div><div id="activities"></div></section>
     <aside class="stack"><section class="panel"><h2 id="editor-title">Add an activity</h2><form id="activity-form">
     <div class="field"><label for="activity-title">Activity name</label><input id="activity-title" required maxlength="100" placeholder="e.g. Map the challenge"></div>

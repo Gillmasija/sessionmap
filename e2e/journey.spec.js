@@ -59,6 +59,26 @@ test('two-tab stale save cannot replace newer data', async ({page,context}) => {
   await expect(second.locator('#status')).toContainText('changed in another tab');
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('sessionmap.v1')).title)).toBe('Newer plan');
 });
+test('browser validation and denied storage leave input visible for recovery', async ({page}) => {
+  await page.goto('/'); await page.getByLabel('Workshop title').fill('My plan'); await page.getByLabel('Target length').fill('4');
+  await page.getByRole('button',{name:'Save session details'}).click();
+  expect(await page.evaluate(()=>localStorage.getItem('sessionmap.v1'))).toBeNull();
+  await page.getByLabel('Target length').fill('90');
+  await page.evaluate(()=>{Storage.prototype.setItem=()=>{throw new DOMException('Quota exceeded','QuotaExceededError');};});
+  await page.getByRole('button',{name:'Save session details'}).click();
+  await expect(page.locator('#status')).toContainText('Could not save');
+  await expect(page.getByLabel('Workshop title')).toHaveValue('My plan');
+  expect(await page.evaluate(()=>localStorage.getItem('sessionmap.v1'))).toBeNull();
+});
+test('oversized and cancelled imports preserve existing data', async ({page}) => {
+  await demo(page); const before=await page.evaluate(()=>localStorage.getItem('sessionmap.v1'));
+  await page.locator('#import').setInputFiles({name:'huge.json',mimeType:'application/json',buffer:Buffer.alloc(400001,32)});
+  await expect(page.locator('#status')).toContainText('too large');
+  page.once('dialog',d=>d.dismiss());
+  await page.locator('#import').setInputFiles({name:'ok.json',mimeType:'application/json',buffer:Buffer.from(before)});
+  await expect(page.locator('#status')).toContainText('cancelled');
+  expect(await page.evaluate(()=>localStorage.getItem('sessionmap.v1'))).toBe(before);
+});
 for (const width of [1280,390,320]) test(`responsive pages at ${width}px`, async ({page}) => {
   await page.setViewportSize({width,height:900}); await demo(page);
   for (const route of ['index.html','agenda.html','sheet.html']) {
@@ -66,4 +86,10 @@ for (const width of [1280,390,320]) test(`responsive pages at ${width}px`, async
     expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.locator('nav [aria-current="page"]')).toHaveCount(1);
   }
+});
+test('keyboard skip link and activity shortcut reach the editing surface', async ({page}) => {
+  await page.goto('/agenda.html'); await page.keyboard.press('Tab');
+  await expect(page.getByRole('link',{name:'Skip to content'})).toBeFocused();
+  await page.getByRole('link',{name:'Add an activity',exact:true}).focus(); await page.keyboard.press('Enter');
+  await expect(page.getByLabel('Activity name')).toBeFocused();
 });
